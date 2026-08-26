@@ -1,4 +1,3 @@
-
 function [model_W] = ML_TSKFS( X, Y, optmParameter)
     
    %% optimization parameters
@@ -10,11 +9,24 @@ function [model_W] = ML_TSKFS( X, Y, optmParameter)
 
    %% initializtion
     num_dim = size(X,2);
+    num_targets = size(Y,2);
     XTX = X'*X;
     XTY = X'*Y;
     W_s   = (XTX + gamma*eye(num_dim)) \ (2*XTY);
     W_s_1 = W_s;
-    R = 1 - corr(Y,'type','Pearson');
+    
+    %% SUBSTITUTO DO 'corr' (Cálculo de Pearson Manual sem Toolboxes)
+    if num_targets == 1
+        R = 0; % Se há apenas 1 variável de saída, a matriz R é zero.
+    else
+        Y_mu = mean(Y, 1);
+        Y_centered = Y - repmat(Y_mu, size(Y,1), 1);
+        sq = sqrt(sum(Y_centered.^2, 1));
+        sq(sq == 0) = eps; % Evita divisão por zero
+        corr_Y = (Y_centered' * Y_centered) ./ (sq' * sq);
+        R = 1 - corr_Y;
+    end
+    
     iter    = 1;
     oldloss = 0;
     
@@ -34,9 +46,9 @@ function [model_W] = ML_TSKFS( X, Y, optmParameter)
        W_s    = softthres(Gw_s_k,beta/Lip);
        
        predictionLoss = trace((X*W_s - Y)'*(X*W_s - Y));
-       correlation     = trace(R*W_s'*W_s);
-       sparsity    = sum(sum(W_s~=0));
-       totalloss = predictionLoss + alpha*correlation + beta*sparsity;
+       correlation    = trace(R*W_s'*W_s);
+       sparsity       = sum(sum(W_s~=0));
+       totalloss      = predictionLoss + alpha*correlation + beta*sparsity;
       
        if abs(oldloss - totalloss) <= miniLossMargin
            break;
@@ -51,7 +63,6 @@ function [model_W] = ML_TSKFS( X, Y, optmParameter)
     model_W = W_s;
 
 end
-
 
 %% soft thresholding operator
 function W = softthres(W_t,lambda)
